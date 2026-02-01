@@ -72,6 +72,11 @@ export async function parseMessageWithGemini(
 2. 語系：正體中文。
 3. 'edit' 若未指名時間，視為修改「最近一筆」。
 4. 時間格式：YYYY-MM-DD HH:mm。
+5. 若為 'unknown'，"clarificationPrompt" 必須包含像這樣的引導範例：
+   「我暫時還沒理解您的意思，您可以試著這樣說說看：
+   🐾 記錄內容：『大寶 12:00 吃飯』
+   🔍 查詢紀錄：『大寶今天做了什麼？』
+   ...」
 
 範例：
 - 「大寶12:00在睡覺」-> {"intent":"add_diary","petName":"大寶","action":"睡覺","time":"${today} 12:00"}
