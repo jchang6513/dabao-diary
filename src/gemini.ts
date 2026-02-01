@@ -1,13 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ParsedMessage {
-  intent: 'add_diary' | 'add_pet' | 'query' | 'edit' | 'attach_photo' | 'unknown';
+  intent: 'add_diary' | 'add_pet' | 'query' | 'edit' | 'unknown';
   petName: string | null;
   petType: string | null;
   action: string | null;
   description: string | null;
   time: string | null;
-  // For 'edit' or 'attach_photo' targets
+  // For 'edit' intent
   editTarget: 'pet' | 'diary' | null;
   newPetName?: string | null;
   newPetType?: string | null;
@@ -70,8 +70,7 @@ export async function parseMessageWithGemini(
   2. 'add_pet': 新增寵物。
   3. 'query': 查詢資訊。
   4. 'edit': 編輯現有資訊 (如：「將小雞的種類改為蛇」、「把大寶剛才的描述改為好乖」)。
-  5. 'attach_photo': 為特定日記補上/上傳照片 (如：「幫剛才那筆日記加照片」、「我要為大寶三點的記錄補傳照片」)。
-  6. 'unknown': 不明或問候。
+  5. 'unknown': 不明或問候。
 
   請根據意圖提取資訊並回傳 JSON 格式：
 
@@ -89,12 +88,10 @@ export async function parseMessageWithGemini(
 
   範例：
   - 「修改小雞的種類為蛇」 -> {"intent": "edit", "editTarget": "pet", "petName": "小雞", "newPetType": "蛇"}
-  - 「把大寶剛才的描述改成在睡覺」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "newDescription": "在睡覺"}
   - 「將大寶下午三點的動作改為吃飯」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "time": "${today} 15:00", "newAction": "吃飯"}
-  - 「幫大寶剛才的記錄補傳照片」 -> {"intent": "attach_photo", "petName": "大寶", "time": null}
 
   注意：
-  - 如果是補傳照片但沒指定時間，通常指「最近的一筆」。
+  - 如果是編輯日記但沒指定時間，通常指「最近的一筆」。
   - 請只回傳 JSON 物件。
   `;
 

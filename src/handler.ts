@@ -9,8 +9,13 @@ const config = {
 
 const client = new line.Client(config);
 
-// Simple in-memory state management (User ID -> Target Diary Row Index)
-const userState = new Map<string, number>();
+// Column indices for Diary sheet
+const DIARY_COLUMNS = {
+  TIME: 0,
+  PET_NAME: 1,
+  ACTION: 2,
+  DESCRIPTION: 3,
+};
 
 // Main event handler
 export async function handleEvent(event: line.WebhookEvent): Promise<any> {
@@ -22,46 +27,11 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
       if (event.message.type === 'text') {
         return handleTextMessage(event as line.MessageEvent & { message: line.TextEventMessage });
       }
-      if (event.message.type === 'image') {
-        return handleImageMessage(event as line.MessageEvent & { message: line.ImageEventMessage }, userId);
-      }
       break;
     case 'postback':
       return handlePostback(event, userId);
     default:
       return Promise.resolve(null);
-  }
-}
-
-async function handleImageMessage(event: line.MessageEvent & { message: line.ImageEventMessage }, userId: string): Promise<any> {
-  try {
-    const targetRowIndex = userState.get(userId);
-    
-    if (targetRowIndex === undefined) {
-      return client.replyMessage(event.replyToken, { type: 'text', text: '我不確定這張照片要對應哪一筆日記。您可以說「幫剛才那筆日記加照片」後再上傳。' });
-    }
-
-    const imageId = event.message.id;
-    const diaryData = await readSheet('Diary!A:E');
-    
-    if (!diaryData || !diaryData[targetRowIndex]) {
-      userState.delete(userId);
-      return client.replyMessage(event.replyToken, { type: 'text', text: '找不到對應的日記資料。' });
-    }
-
-    const updatedRow = [...diaryData[targetRowIndex]];
-    // Ensure row has 5 columns
-    while (updatedRow.length < 5) updatedRow.push('');
-    updatedRow[4] = imageId;
-
-    await updateSheet(`Diary!A${targetRowIndex + 1}:E${targetRowIndex + 1}`, [updatedRow]);
-    
-    userState.delete(userId); // Clear state after success
-    return client.replyMessage(event.replyToken, { type: 'text', text: `照片已成功關聯至「${updatedRow[0]}」的日記！` });
-
-  } catch (error) {
-    console.error('Error handling image message:', error);
-    return client.replyMessage(event.replyToken, { type: 'text', text: '處理照片時發生錯誤。' });
   }
 }
 
@@ -80,14 +50,14 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
   }
 
   if (parsedData.queryTarget === 'diary') {
-    const diaryData = await readSheet('Diary!A:E');
+    const diaryData = await readSheet('Diary!A:D');
     if (!diaryData || diaryData.length === 0) return '目前沒有任何日記。';
 
     const filters = parsedData.queryFilters || {};
     const filteredEntries = diaryData.filter(entry => {
-      const entryDate = entry[3] ? entry[3].substring(0, 10) : '';
-      const petMatch = !filters.petName || entry[0] === filters.petName;
-      const actionMatch = !filters.actionName || entry[1] === filters.actionName;
+      const entryDate = entry[DIARY_COLUMNS.TIME] ? entry[DIARY_COLUMNS.TIME].substring(0, 10) : '';
+      const petMatch = !filters.petName || entry[DIARY_COLUMNS.PET_NAME] === filters.petName;
+      const actionMatch = !filters.actionName || entry[DIARY_COLUMNS.ACTION] === filters.actionName;
       
       let dateMatch = true;
       if (filters.startDate && entryDate < filters.startDate) dateMatch = false;
@@ -98,8 +68,7 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
 
     if (filteredEntries.length > 0) {
       const formattedEntries = filteredEntries.slice(-10).map(entry => {
-        const hasImage = entry[4] ? ' [有照片]' : '';
-        return `- [${entry[3]}] ${entry[0]} ${entry[1]}: ${entry[2]}${hasImage}`;
+        return `- [${entry[DIARY_COLUMNS.TIME]}] ${entry[DIARY_COLUMNS.PET_NAME]} ${entry[DIARY_COLUMNS.ACTION]}: ${entry[DIARY_COLUMNS.DESCRIPTION]}`;
       }).join('\n');
       return `查詢結果 (最多顯示 10 筆)：\n${formattedEntries}`;
     }
@@ -133,27 +102,27 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
   }
 
   if (parsedData.editTarget === 'diary' && parsedData.petName) {
-    const diaryData = await readSheet('Diary!A:E');
+    const diaryData = await readSheet('Diary!A:D');
     if (!diaryData) return '讀取資料失敗。';
 
     // Find entries for this pet, matching time if provided, otherwise the latest one
     let targetIndex = -1;
     if (parsedData.time) {
-      targetIndex = diaryData.findLastIndex(row => row[0] === parsedData.petName && row[3].includes(parsedData.time!));
+      targetIndex = diaryData.findLastIndex(row => row[DIARY_COLUMNS.PET_NAME] === parsedData.petName && row[DIARY_COLUMNS.TIME].includes(parsedData.time!));
     } else {
-      targetIndex = diaryData.findLastIndex(row => row[0] === parsedData.petName);
+      targetIndex = diaryData.findLastIndex(row => row[DIARY_COLUMNS.PET_NAME] === parsedData.petName);
     }
 
     if (targetIndex === -1) return '找不到符合條件的日記。';
 
     const currentRow = diaryData[targetIndex];
-    const newPetName = parsedData.newPetName || currentRow[0];
-    const newAction = parsedData.newAction || currentRow[1];
-    const newDescription = parsedData.newDescription || currentRow[2];
-    const newTime = parsedData.newTime || currentRow[3];
+    const newTime = parsedData.newTime || currentRow[DIARY_COLUMNS.TIME];
+    const newPetName = parsedData.newPetName || currentRow[DIARY_COLUMNS.PET_NAME];
+    const newAction = parsedData.newAction || currentRow[DIARY_COLUMNS.ACTION];
+    const newDescription = parsedData.newDescription || currentRow[DIARY_COLUMNS.DESCRIPTION];
 
     // Ensure target pet exists if renaming pet in diary
-    if (parsedData.newPetName && parsedData.newPetName !== currentRow[0]) {
+    if (parsedData.newPetName && parsedData.newPetName !== currentRow[DIARY_COLUMNS.PET_NAME]) {
         const petsData = await readSheet('Pets!A:A');
         const pets = petsData ? petsData.flat().filter(Boolean) : [];
         if (!pets.includes(newPetName)) {
@@ -161,33 +130,17 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
         }
     }
 
-    const updatedRow = [newPetName, newAction, newDescription, newTime, currentRow[4] || ''];
-    await updateSheet(`Diary!A${targetIndex + 1}:E${targetIndex + 1}`, [updatedRow]);
+    const updatedRow = [];
+    updatedRow[DIARY_COLUMNS.TIME] = newTime;
+    updatedRow[DIARY_COLUMNS.PET_NAME] = newPetName;
+    updatedRow[DIARY_COLUMNS.ACTION] = newAction;
+    updatedRow[DIARY_COLUMNS.DESCRIPTION] = newDescription;
+
+    await updateSheet(`Diary!A${targetIndex + 1}:D${targetIndex + 1}`, [updatedRow]);
     return `已更新「${parsedData.petName}」的日記內容。`;
   }
 
   return '抱歉，我不確定您想修改什麼。';
-}
-
-async function handleAttachPhoto(parsedData: ParsedMessage, userId: string): Promise<string> {
-  const diaryData = await readSheet('Diary!A:E');
-  if (!diaryData) return '讀取資料失敗。';
-
-  let targetIndex = -1;
-  if (parsedData.petName || parsedData.time) {
-    targetIndex = diaryData.findLastIndex(row => {
-      const petMatch = !parsedData.petName || row[0] === parsedData.petName;
-      const timeMatch = !parsedData.time || row[3].includes(parsedData.time);
-      return petMatch && timeMatch;
-    });
-  } else {
-    targetIndex = diaryData.length - 1; // Default to last entry
-  }
-
-  if (targetIndex === -1) return '找不到符合條件的日記。';
-
-  userState.set(userId, targetIndex);
-  return `好的，請現在傳送「${diaryData[targetIndex][0]}」在「${diaryData[targetIndex][3]}」這筆記錄的照片。`;
 }
 
 // Handler for when a user sends a text message
@@ -210,11 +163,6 @@ async function handleTextMessage(event: line.MessageEvent & { message: line.Text
 
     if (parsedData.intent === 'edit') {
       const response = await handleEdit(parsedData);
-      return client.replyMessage(event.replyToken, { type: 'text', text: response });
-    }
-
-    if (parsedData.intent === 'attach_photo') {
-      const response = await handleAttachPhoto(parsedData, userId);
       return client.replyMessage(event.replyToken, { type: 'text', text: response });
     }
 
@@ -277,14 +225,6 @@ async function handlePostback(event: line.PostbackEvent, userId: string): Promis
     return client.replyMessage(event.replyToken, { type: 'text', text: '好的，請直接輸入正確的內容，我會重新為您解析。' });
   }
 
-  if (action === 'prepare_photo') {
-    const rowIndex = parseInt(data.get('rowIndex') || '-1');
-    if (rowIndex !== -1) {
-      userState.set(userId, rowIndex);
-      return client.replyMessage(event.replyToken, { type: 'text', text: '好的，請傳送照片，我會幫您關聯到剛才的日記。' });
-    }
-  }
-
   try {
     if (action === 'confirm_add_pet') {
       const petName = data.get('petName')!;
@@ -320,24 +260,15 @@ async function handlePostback(event: line.PostbackEvent, userId: string): Promis
         await appendSheet('Actions!A:A', [[actionName]]);
       }
 
-      await appendSheet('Diary!A:D', [[petName, actionName, description, time]]);
-      
-      // Get the index of the newly added row
-      const updatedDiaryData = await readSheet('Diary!A:A');
-      const newRowIndex = (updatedDiaryData?.length || 1) - 1;
+      const newRow = [];
+      newRow[DIARY_COLUMNS.TIME] = time;
+      newRow[DIARY_COLUMNS.PET_NAME] = petName;
+      newRow[DIARY_COLUMNS.ACTION] = actionName;
+      newRow[DIARY_COLUMNS.DESCRIPTION] = description;
 
-      return client.replyMessage(event.replyToken, {
-        type: 'template',
-        altText: '日記已儲存，要上傳照片嗎？',
-        template: {
-          type: 'buttons',
-          text: '日記已成功儲存！需要現在上傳照片嗎？',
-          actions: [
-            { type: 'postback', label: '上傳照片', data: `action=prepare_photo&rowIndex=${newRowIndex}` },
-            { type: 'postback', label: '不用了', data: 'action=cancel' },
-          ],
-        },
-      });
+      await appendSheet('Diary!A:D', [newRow]);
+      
+      return client.replyMessage(event.replyToken, { type: 'text', text: '日記已成功儲存！' });
     }
   } catch (error) {
     console.error('Error in handlePostback:', error);
