@@ -9,6 +9,41 @@ const config = {
 
 const client = new line.Client(config);
 
+/**
+ * 封裝 LINE SDK 的回覆邏輯，簡化 handler 調用
+ */
+class LineBotContext {
+  constructor(private client: line.Client, private replyToken: string) {}
+
+  async sendText(text: string) {
+    return this.client.replyMessage(this.replyToken, { type: 'text', text });
+  }
+
+  async sendConfirm(text: string, actions: line.Action[]) {
+    return this.client.replyMessage(this.replyToken, {
+      type: 'template',
+      altText: text,
+      template: {
+        type: 'confirm',
+        text,
+        actions,
+      },
+    });
+  }
+
+  async sendButtons(text: string, altText: string, actions: line.Action[]) {
+    return this.client.replyMessage(this.replyToken, {
+      type: 'template',
+      altText: altText || text,
+      template: {
+        type: 'buttons',
+        text,
+        actions,
+      },
+    });
+  }
+}
+
 // Column indices for Diary sheet
 const DIARY_COLUMNS = {
   TIME: 0,
@@ -19,19 +54,28 @@ const DIARY_COLUMNS = {
 
 // Main event handler
 export async function handleEvent(event: line.WebhookEvent): Promise<any> {
+  if (event.type !== 'message' && event.type !== 'postback') return Promise.resolve(null);
+  if (!('replyToken' in event)) return Promise.resolve(null);
+
+  const ctx = new LineBotContext(client, event.replyToken);
   const userId = event.source.userId;
   if (!userId) return Promise.resolve(null);
 
-  switch (event.type) {
-    case 'message':
-      if (event.message.type === 'text') {
-        return handleTextMessage(event as line.MessageEvent & { message: line.TextEventMessage });
-      }
-      break;
-    case 'postback':
-      return handlePostback(event, userId);
-    default:
-      return Promise.resolve(null);
+  try {
+    switch (event.type) {
+      case 'message':
+        if (event.message.type === 'text') {
+          return handleTextMessage(ctx, event as line.MessageEvent & { message: line.TextEventMessage });
+        }
+        break;
+      case 'postback':
+        return handlePostback(ctx, event);
+      default:
+        return Promise.resolve(null);
+    }
+  } catch (error) {
+    console.error('Handler Error:', error);
+    return ctx.sendText('抱歉，處理您的請求時發生錯誤。');
   }
 }
 
@@ -112,7 +156,7 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
         return petMatch && timeMatch;
       });
     } else {
-      targetIndex = diaryData.length - 1; // Default to the absolute last entry
+      targetIndex = diaryData.length - 1; 
     }
 
     if (targetIndex === -1) return '找不到符合條件的日記。';
@@ -148,134 +192,103 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
 }
 
 // Handler for when a user sends a text message
-async function handleTextMessage(event: line.MessageEvent & { message: line.TextEventMessage }): Promise<any> {
+async function handleTextMessage(ctx: LineBotContext, event: line.MessageEvent & { message: line.TextEventMessage }): Promise<any> {
   const userMessage = event.message.text.trim();
-  const userId = event.source.userId!;
 
-  try {
-    const petsData = await readSheet('Pets!A:A');
-    const pets = petsData ? petsData.flat().filter(Boolean) : [];
-    const actionsData = await readSheet('Actions!A:A');
-    const actions = actionsData ? actionsData.flat().filter(Boolean) : [];
+  const petsData = await readSheet('Pets!A:A');
+  const pets = petsData ? petsData.flat().filter(Boolean) : [];
+  const actionsData = await readSheet('Actions!A:A');
+  const actions = actionsData ? actionsData.flat().filter(Boolean) : [];
 
-    const parsedData = await parseMessageWithGemini(userMessage, pets, actions);
-    
-    if (parsedData.intent === 'query') {
-      const response = await handleQuery(parsedData);
-      return client.replyMessage(event.replyToken, { type: 'text', text: response });
-    }
-
-    if (parsedData.intent === 'edit') {
-      const response = await handleEdit(parsedData);
-      return client.replyMessage(event.replyToken, { type: 'text', text: response });
-    }
-
-    if (parsedData.intent === 'add_pet' && parsedData.petName) {
-      if (pets.includes(parsedData.petName)) {
-          return client.replyMessage(event.replyToken, { type: 'text', text: `寵物「${parsedData.petName}」已經存在囉！` });
-      }
-      const confirmationText = `確定要新增寵物嗎？\n名稱：${parsedData.petName}\n種類：${parsedData.petType || '未知'}`;
-      return client.replyMessage(event.replyToken, {
-        type: 'template',
-        altText: confirmationText,
-        template: {
-          type: 'confirm',
-          text: confirmationText,
-          actions: [
-            { type: 'postback', label: '是', data: `action=confirm_add_pet&petName=${encodeURIComponent(parsedData.petName!)}&petType=${encodeURIComponent(parsedData.petType || '')}` },
-            { type: 'postback', label: '否', data: 'action=cancel' },
-          ],
-        },
-      });
-    }
-
-    if (parsedData.intent === 'add_diary' && parsedData.petName && parsedData.action) {
-      const confirmationText = `請確認日記內容：\n事件：${parsedData.action}\n描述：${parsedData.description || '無'}\n時間：${parsedData.time}\n寵物：${parsedData.petName}`;
-      const postbackData = `action=confirm_add_diary&petName=${encodeURIComponent(parsedData.petName)}&actionName=${encodeURIComponent(parsedData.action)}&description=${encodeURIComponent(parsedData.description || '')}&time=${encodeURIComponent(parsedData.time || '')}`;
-      
-      return client.replyMessage(event.replyToken, {
-        type: 'template',
-        altText: '確認日記內容',
-        template: {
-          type: 'buttons',
-          text: confirmationText,
-          actions: [
-            { type: 'postback', label: '是，儲存', data: postbackData },
-            { type: 'postback', label: '否，需修改', data: 'action=modify' },
-            { type: 'postback', label: '取消', data: 'action=cancel' },
-          ],
-        },
-      });
-    }
-
-    const reply = parsedData.clarificationPrompt || "抱歉，我不太懂您的意思，可以再說清楚一點嗎？例如：「大寶三點吃飯」或「查詢大寶今天的日記」。";
-    return client.replyMessage(event.replyToken, { type: 'text', text: reply });
-
-  } catch (error) {
-    console.error('Error handling text message:', error);
-    return client.replyMessage(event.replyToken, { type: 'text', text: '處理時發生錯誤，請稍後再試。' });
+  const parsedData = await parseMessageWithGemini(userMessage, pets, actions);
+  
+  if (parsedData.intent === 'query') {
+    const response = await handleQuery(parsedData);
+    return ctx.sendText(response);
   }
+
+  if (parsedData.intent === 'edit') {
+    const response = await handleEdit(parsedData);
+    return ctx.sendText(response);
+  }
+
+  if (parsedData.intent === 'add_pet' && parsedData.petName) {
+    if (pets.includes(parsedData.petName)) {
+        return ctx.sendText(`寵物「${parsedData.petName}」已經存在囉！`);
+    }
+    const confirmationText = `確定要新增寵物嗎？\n名稱：${parsedData.petName}\n種類：${parsedData.petType || '未知'}`;
+    return ctx.sendConfirm(confirmationText, [
+      { type: 'postback', label: '是', data: `action=confirm_add_pet&petName=${encodeURIComponent(parsedData.petName!)}&petType=${encodeURIComponent(parsedData.petType || '')}` },
+      { type: 'postback', label: '否', data: 'action=cancel' },
+    ]);
+  }
+
+  if (parsedData.intent === 'add_diary' && parsedData.petName && parsedData.action) {
+    const confirmationText = `請確認日記內容：\n事件：${parsedData.action}\n描述：${parsedData.description || '無'}\n時間：${parsedData.time}\n寵物：${parsedData.petName}`;
+    const postbackData = `action=confirm_add_diary&petName=${encodeURIComponent(parsedData.petName)}&actionName=${encodeURIComponent(parsedData.action)}&description=${encodeURIComponent(parsedData.description || '')}&time=${encodeURIComponent(parsedData.time || '')}`;
+    
+    return ctx.sendButtons(confirmationText, '確認日記內容', [
+      { type: 'postback', label: '是，儲存', data: postbackData },
+      { type: 'postback', label: '否，需修改', data: 'action=modify' },
+      { type: 'postback', label: '取消', data: 'action=cancel' },
+    ]);
+  }
+
+  const reply = parsedData.clarificationPrompt || "抱歉，我不太懂您的意思，可以再說清楚一點嗎？例如：「大寶三點吃飯」或「查詢大寶今天的日記」。";
+  return ctx.sendText(reply);
 }
 
-async function handlePostback(event: line.PostbackEvent, userId: string): Promise<any> {
+async function handlePostback(ctx: LineBotContext, event: line.PostbackEvent): Promise<any> {
   const data = new URLSearchParams(event.postback.data);
   const action = data.get('action');
 
   if (action === 'cancel') {
-    return client.replyMessage(event.replyToken, { type: 'text', text: '已取消操作。' });
+    return ctx.sendText('已取消操作。');
   }
 
   if (action === 'modify') {
-    return client.replyMessage(event.replyToken, { type: 'text', text: '好的，請直接輸入正確的內容，我會重新為您解析。' });
+    return ctx.sendText('好的，請直接輸入正確的內容，我會重新為您解析。');
   }
 
-  try {
-    if (action === 'confirm_add_pet') {
-      const petName = data.get('petName')!;
-      const petType = data.get('petType') || '未知';
-      
-      const petsData = await readSheet('Pets!A:A');
-      const pets = petsData ? petsData.flat().filter(Boolean) : [];
-      if (pets.includes(petName)) {
-          return client.replyMessage(event.replyToken, { type: 'text', text: `寵物「${petName}」已經存在囉！` });
-      }
-
-      await appendSheet('Pets!A:B', [[petName, petType]]);
-      return client.replyMessage(event.replyToken, { type: 'text', text: `已成功新增寵物：${petName} (${petType})` });
+  if (action === 'confirm_add_pet') {
+    const petName = data.get('petName')!;
+    const petType = data.get('petType') || '未知';
+    
+    const petsData = await readSheet('Pets!A:A');
+    const pets = petsData ? petsData.flat().filter(Boolean) : [];
+    if (pets.includes(petName)) {
+        return ctx.sendText(`寵物「${petName}」已經存在囉！`);
     }
 
-    if (action === 'confirm_add_diary') {
-      const petName = data.get('petName')!;
-      const actionName = data.get('actionName')!;
-      const description = data.get('description') || '';
-      const time = data.get('time') || new Date().toISOString();
+    await appendSheet('Pets!A:B', [[petName, petType]]);
+    return ctx.sendText(`已成功新增寵物：${petName} (${petType})`);
+  }
 
-      // Check if pet exists
-      const petsData = await readSheet('Pets!A:A');
-      const pets = petsData ? petsData.flat().filter(Boolean) : [];
-      if (!pets.includes(petName)) {
-        await appendSheet('Pets!A:B', [[petName, '未知']]);
-      }
+  if (action === 'confirm_add_diary') {
+    const petName = data.get('petName')!;
+    const actionName = data.get('actionName')!;
+    const description = data.get('description') || '';
+    const time = data.get('time') || new Date().toISOString();
 
-      // Check if action exists
-      const actionsData = await readSheet('Actions!A:A');
-      const actions = actionsData ? actionsData.flat().filter(Boolean) : [];
-      if (!actions.includes(actionName)) {
-        await appendSheet('Actions!A:A', [[actionName]]);
-      }
-
-      const newRow = [];
-      newRow[DIARY_COLUMNS.TIME] = time;
-      newRow[DIARY_COLUMNS.PET_NAME] = petName;
-      newRow[DIARY_COLUMNS.ACTION] = actionName;
-      newRow[DIARY_COLUMNS.DESCRIPTION] = description;
-
-      await appendSheet('Diary!A:D', [newRow]);
-      
-      return client.replyMessage(event.replyToken, { type: 'text', text: '日記已成功儲存！' });
+    const petsData = await readSheet('Pets!A:A');
+    const pets = petsData ? petsData.flat().filter(Boolean) : [];
+    if (!pets.includes(petName)) {
+      await appendSheet('Pets!A:B', [[petName, '未知']]);
     }
-  } catch (error) {
-    console.error('Error in handlePostback:', error);
-    return client.replyMessage(event.replyToken, { type: 'text', text: '儲存資料時發生錯誤。' });
+
+    const actionsData = await readSheet('Actions!A:A');
+    const actions = actionsData ? actionsData.flat().filter(Boolean) : [];
+    if (!actions.includes(actionName)) {
+      await appendSheet('Actions!A:A', [[actionName]]);
+    }
+
+    const newRow = [];
+    newRow[DIARY_COLUMNS.TIME] = time;
+    newRow[DIARY_COLUMNS.PET_NAME] = petName;
+    newRow[DIARY_COLUMNS.ACTION] = actionName;
+    newRow[DIARY_COLUMNS.DESCRIPTION] = description;
+
+    await appendSheet('Diary!A:D', [newRow]);
+    return ctx.sendText('日記已成功儲存！');
   }
 }
