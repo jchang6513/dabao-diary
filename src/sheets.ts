@@ -12,10 +12,7 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 async function getGoogleSheetClient(): Promise<sheets_v4.Sheets> {
   const auth = new GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    },
+    keyFile: 'service-account.json', // Look for the key file in the project root
     scopes: SCOPES,
   });
 
