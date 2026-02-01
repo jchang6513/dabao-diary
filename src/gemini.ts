@@ -11,13 +11,14 @@ export interface ParsedMessage {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-pro';
 
 if (!GEMINI_API_KEY) {
   console.error('GEMINI_API_KEY is not set in environment variables.');
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 export async function parseMessageWithGemini(
   message: string,
