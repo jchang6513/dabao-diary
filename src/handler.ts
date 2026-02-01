@@ -90,7 +90,6 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
     const newPetName = parsedData.newPetName || currentRow[0];
     const newPetType = parsedData.newPetType || currentRow[1];
     
-    // Check for duplicate name if renaming
     if (parsedData.newPetName && parsedData.newPetName !== parsedData.petName) {
       if (petsData.some(row => row[0] === parsedData.newPetName)) {
         return `更新失敗：名稱「${parsedData.newPetName}」已存在。`;
@@ -98,49 +97,54 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
     }
     
     await updateSheet(`Pets!A${rowIndex + 1}:B${rowIndex + 1}`, [[newPetName, newPetType]]);
-    return `已更新寵物「${parsedData.petName}」的資訊。`;
+    return `已更新寵物「${parsedData.petName}」的資訊為：${newPetName} (${newPetType})`;
   }
 
-  if (parsedData.editTarget === 'diary' && parsedData.petName) {
+  if (parsedData.editTarget === 'diary') {
     const diaryData = await readSheet('Diary!A:D');
-    if (!diaryData) return '讀取資料失敗。';
+    if (!diaryData || diaryData.length === 0) return '目前沒有任何日記可以修改。';
 
-    // Find entries for this pet, matching time if provided, otherwise the latest one
     let targetIndex = -1;
-    if (parsedData.time) {
-      targetIndex = diaryData.findLastIndex(row => row[DIARY_COLUMNS.PET_NAME] === parsedData.petName && row[DIARY_COLUMNS.TIME].includes(parsedData.time!));
+    if (parsedData.petName || parsedData.time) {
+      targetIndex = diaryData.findLastIndex(row => {
+        const petMatch = !parsedData.petName || row[DIARY_COLUMNS.PET_NAME] === parsedData.petName;
+        const timeMatch = !parsedData.time || row[DIARY_COLUMNS.TIME].includes(parsedData.time);
+        return petMatch && timeMatch;
+      });
     } else {
-      targetIndex = diaryData.findLastIndex(row => row[DIARY_COLUMNS.PET_NAME] === parsedData.petName);
+      targetIndex = diaryData.length - 1; // Default to the absolute last entry
     }
 
     if (targetIndex === -1) return '找不到符合條件的日記。';
 
     const currentRow = diaryData[targetIndex];
-    const newTime = parsedData.newTime || currentRow[DIARY_COLUMNS.TIME];
-    const newPetName = parsedData.newPetName || currentRow[DIARY_COLUMNS.PET_NAME];
-    const newAction = parsedData.newAction || currentRow[DIARY_COLUMNS.ACTION];
-    const newDescription = parsedData.newDescription || currentRow[DIARY_COLUMNS.DESCRIPTION];
-
-    // Ensure target pet exists if renaming pet in diary
-    if (parsedData.newPetName && parsedData.newPetName !== currentRow[DIARY_COLUMNS.PET_NAME]) {
-        const petsData = await readSheet('Pets!A:A');
-        const pets = petsData ? petsData.flat().filter(Boolean) : [];
-        if (!pets.includes(newPetName)) {
-            await appendSheet('Pets!A:B', [[newPetName, '未知']]);
-        }
+    const updatedRow = [...currentRow];
+    
+    const changes: string[] = [];
+    if (parsedData.newTime) {
+      updatedRow[DIARY_COLUMNS.TIME] = parsedData.newTime;
+      changes.push(`時間：${parsedData.newTime}`);
+    }
+    if (parsedData.newPetName) {
+      updatedRow[DIARY_COLUMNS.PET_NAME] = parsedData.newPetName;
+      changes.push(`寵物：${parsedData.newPetName}`);
+    }
+    if (parsedData.newAction) {
+      updatedRow[DIARY_COLUMNS.ACTION] = parsedData.newAction;
+      changes.push(`動作：${parsedData.newAction}`);
+    }
+    if (parsedData.newDescription !== undefined && parsedData.newDescription !== null) {
+      updatedRow[DIARY_COLUMNS.DESCRIPTION] = parsedData.newDescription;
+      changes.push(`描述：${parsedData.newDescription}`);
     }
 
-    const updatedRow = [];
-    updatedRow[DIARY_COLUMNS.TIME] = newTime;
-    updatedRow[DIARY_COLUMNS.PET_NAME] = newPetName;
-    updatedRow[DIARY_COLUMNS.ACTION] = newAction;
-    updatedRow[DIARY_COLUMNS.DESCRIPTION] = newDescription;
+    if (changes.length === 0) return '未偵測到需要修改的內容。';
 
     await updateSheet(`Diary!A${targetIndex + 1}:D${targetIndex + 1}`, [updatedRow]);
-    return `已更新「${parsedData.petName}」的日記內容。`;
+    return `已更新日記內容：\n${changes.join('\n')}`;
   }
 
-  return '抱歉，我不確定您想修改什麼。';
+  return '抱歉，我不確定您想修改什麼。可以說「把大寶剛才的時間改為 12:00」或「修改剛剛那筆的描述」。';
 }
 
 // Handler for when a user sends a text message
