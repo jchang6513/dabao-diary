@@ -108,11 +108,12 @@ async function handleTextMessage(event: line.MessageEvent & { message: line.Text
         type: 'template',
         altText: '確認日記內容',
         template: {
-          type: 'confirm',
+          type: 'buttons',
           text: confirmationText,
           actions: [
-            { type: 'postback', label: '是', data: postbackData },
-            { type: 'postback', label: '否', data: 'action=cancel' },
+            { type: 'postback', label: '是，儲存', data: postbackData },
+            { type: 'postback', label: '否，需修改', data: 'action=modify' },
+            { type: 'postback', label: '取消', data: 'action=cancel' },
           ],
         },
       });
@@ -134,6 +135,10 @@ async function handlePostback(event: line.PostbackEvent): Promise<any> {
 
   if (action === 'cancel') {
     return client.replyMessage(event.replyToken, { type: 'text', text: '已取消操作。' });
+  }
+
+  if (action === 'modify') {
+    return client.replyMessage(event.replyToken, { type: 'text', text: '好的，請直接輸入正確的內容，我會重新為您解析。' });
   }
 
   try {
