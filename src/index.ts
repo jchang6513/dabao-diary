@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import * as line from '@line/bot-sdk';
 import { handleEvent } from './handler';
