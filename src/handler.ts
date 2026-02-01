@@ -24,11 +24,57 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
   }
 }
 
+// Sub-handler for query commands
+async function handleCommand(command: string): Promise<string | null> {
+  if (command === '列出寵物') {
+    const petsData = await readSheet('Pets!A:A');
+    const pets = petsData ? petsData.flat().filter(Boolean) : [];
+    if (pets.length > 0) {
+      return `目前已記錄的寵物有：\n- ${pets.join('\n- ')}`;
+    } else {
+      return '目前沒有記錄任何寵物。';
+    }
+  }
+
+  if (command === '列出動作') {
+    const actionsData = await readSheet('Actions!A:A');
+    const actions = actionsData ? actionsData.flat().filter(Boolean) : [];
+    if (actions.length > 0) {
+      return `目前已設定的動作有：\n- ${actions.join('\n- ')}`;
+    } else {
+      return '目前沒有設定任何動作。';
+    }
+  }
+
+  if (command === '最近的日記') {
+    const diaryData = await readSheet('Diary!A:D');
+    if (diaryData && diaryData.length > 0) {
+      const recentEntries = diaryData.slice(-5); // Get the last 5 entries
+      const formattedEntries = recentEntries.map(entry => 
+        `- ${new Date(entry[3]).toLocaleDateString()} | ${entry[0]}: ${entry[2]}`
+      ).join('\n');
+      return `最近的 5 筆日記：\n${formattedEntries}`;
+    } else {
+      return '目前沒有任何日記。';
+    }
+  }
+
+  // Add other commands here in the future
+  return null;
+}
+
 // Handler for when a user sends a text message
 async function handleTextMessage(event: line.MessageEvent & { message: line.TextEventMessage }): Promise<any> {
-  const userMessage = event.message.text;
+  const userMessage = event.message.text.trim();
 
   try {
+    // First, check if the message is a command
+    const commandResponse = await handleCommand(userMessage);
+    if (commandResponse) {
+      return client.replyMessage(event.replyToken, { type: 'text', text: commandResponse });
+    }
+
+    // If not a command, proceed with Gemini parsing
     const petsData = await readSheet('Pets!A:A');
     const pets = petsData ? petsData.flat().filter(Boolean) : [];
     const actionsData = await readSheet('Actions!A:A');
@@ -36,6 +82,31 @@ async function handleTextMessage(event: line.MessageEvent & { message: line.Text
 
     const parsedData = await parseMessageWithGemini(userMessage, pets, actions);
     
+    // Handle natural language queries
+    if (parsedData.intent === 'query_diary') {
+      const diaryData = await readSheet('Diary!A:D');
+      if (!diaryData || diaryData.length === 0) {
+        return client.replyMessage(event.replyToken, { type: 'text', text: '目前沒有任何日記可供查詢。' });
+      }
+
+      const filteredEntries = diaryData.filter(entry => {
+        const entryDate = entry[3] ? entry[3].substring(0, 10) : ''; // YYYY-MM-DD
+        const petMatch = !parsedData.queryPetName || entry[0] === parsedData.queryPetName;
+        const actionMatch = !parsedData.queryAction || entry[1] === parsedData.queryAction;
+        const dateMatch = !parsedData.queryDate || entryDate === parsedData.queryDate;
+        return petMatch && actionMatch && dateMatch;
+      });
+
+      if (filteredEntries.length > 0) {
+        const formattedEntries = filteredEntries.map(entry => 
+          `- ${new Date(entry[3]).toLocaleString()} | ${entry[0]}: ${entry[2]}`
+        ).join('\n');
+        return client.replyMessage(event.replyToken, { type: 'text', text: `這是您查詢的日記：\n${formattedEntries}` });
+      } else {
+        return client.replyMessage(event.replyToken, { type: 'text', text: '找不到符合條件的日記。' });
+      }
+    }
+
     let confirmationText = '';
     let postbackData = '';
 
