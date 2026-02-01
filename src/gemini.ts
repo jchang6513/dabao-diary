@@ -1,19 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ParsedMessage {
+  intent: 'add_diary' | 'add_pet' | 'unknown';
   petName: string | null;
   action: string | null;
   description: string | null;
-  time: string | null;
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
   console.error('GEMINI_API_KEY is not set in environment variables.');
-  // In a real application, you might want to handle this more gracefully,
-  // perhaps by throwing an error that gets caught higher up.
-  // For now, we'll exit or ensure a default behavior.
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
@@ -27,10 +24,10 @@ export async function parseMessageWithGemini(
   if (!GEMINI_API_KEY) {
     console.warn('GEMINI_API_KEY is missing. Returning placeholder data.');
     return {
+      intent: 'unknown',
       petName: null,
       action: null,
       description: message,
-      time: new Date().toISOString(),
     };
   }
 
@@ -38,30 +35,30 @@ export async function parseMessageWithGemini(
   const actionList = actions.length > 0 ? actions.join(', ') : 'no actions defined yet';
 
   const prompt = `
-  You are an AI assistant that helps manage a pet diary. Your task is to parse a user's message about their pets and extract structured information.
+  You are an AI assistant for a pet diary. Your task is to parse a user's message and determine their intent.
 
   Here's the user's message: "${message}"
 
   Here are the known pet names: [${petList}]
-  Here are the known action categories (e.g., eat, play, sleep, vet, poop): [${actionList}]
+  Here are the known action categories: [${actionList}]
 
-  Please extract the following information from the message and return it as a JSON object.
-  - "petName": The name of the pet mentioned in the message. If multiple pets are mentioned, pick the most relevant one. If no pet name is clearly identified from the known list, return null. If the message indicates adding a *new* pet, identify it, but prioritize known pets for actions.
-  - "action": The action performed by the pet. Try to categorize it into one of the known action categories. If no specific action is mentioned or it doesn't fit a known category, return null.
-  - "description": A more detailed description of the event, including any additional context (e.g., "拉屎" or "開罐罐"). This should be a concise summary of the event.
-  - "time": The time of the event in ISO 8601 format. If no specific time is mentioned, use the current time.
+  First, determine the user's intent. The intent can be one of three things:
+  1.  'add_diary': The user is describing an event or action for a known pet. (e.g., "大寶剛剛拉屎", "開罐罐給肉包吃"). This should be the most common intent.
+  2.  'add_pet': The user is introducing a new pet. (e.g., "I have a new cat call daobao", "Add 大寶").
+  3.  'unknown': The intent is not clear.
 
-  If the message seems to be adding a new pet name, please try to identify the new pet's name for petName.
+  Based on the intent, extract the following information and return it as a JSON object.
+  - "intent": The intent you determined ('add_diary', 'add_pet', 'unknown').
+  - "petName": For 'add_diary', the name of the pet from the known pet list. For 'add_pet', the name of the new pet.
+  - "action": For 'add_diary', categorize the action. If it doesn't fit, return null. For other intents, this should be null.
+  - "description": For 'add_diary', a concise summary of the event. For other intents, this should be null.
 
-  The output should ONLY be a JSON object, like this:
-  {
-    "petName": "大寶",
-    "action": "看醫生",
-    "description": "今天去看醫生",
-    "time": "2026-02-01T12:30:00.000Z"
-  }
-
-  Ensure the JSON is perfectly valid and can be directly parsed.
+  Examples:
+  - Message: "大寶剛剛拉屎" -> {"intent": "add_diary", "petName": "大寶", "action": "poop", "description": "剛剛拉屎"}
+  - Message: "Add a new cat, 小雞" -> {"intent": "add_pet", "petName": "小雞", "action": null, "description": null}
+  - Message: "hi" -> {"intent": "unknown", "petName": null, "action": null, "description": null}
+  
+  The output should ONLY be a valid JSON object.
   `;
 
   try {
@@ -71,24 +68,25 @@ export async function parseMessageWithGemini(
 
     console.log('Gemini raw response:', text);
 
-    // Attempt to parse the text as JSON
-    const parsed = JSON.parse(text);
+    // Clean the text to make sure it's valid JSON
+    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanedText);
 
     // Validate and return
     return {
+      intent: parsed.intent || 'unknown',
       petName: parsed.petName || null,
       action: parsed.action || null,
-      description: parsed.description || message,
-      time: parsed.time || new Date().toISOString(),
+      description: parsed.description || (parsed.intent === 'unknown' ? message : null),
     };
   } catch (error) {
     console.error('Error calling Gemini API or parsing response:', error);
     // Fallback to basic parsing if Gemini fails
     return {
+      intent: 'unknown',
       petName: null,
       action: null,
       description: message,
-      time: new Date().toISOString(),
     };
   }
 }
