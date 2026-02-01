@@ -2,6 +2,7 @@ import * as line from '@line/bot-sdk';
 import { readSheet, appendSheet, updateSheet } from './sheets';
 import { parseMessageWithGemini, ParsedMessage } from './gemini';
 import { LineBotContext } from './context';
+import { DIARY_COLUMNS, PET_COLUMNS, UI_LIMITS, DATE_FORMAT_LENGTHS } from './constants';
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -9,14 +10,6 @@ const config = {
 };
 
 const client = new line.Client(config);
-
-// Column indices for Diary sheet
-const DIARY_COLUMNS = {
-  TIME: 0,
-  PET_NAME: 1,
-  ACTION: 2,
-  DESCRIPTION: 3,
-};
 
 // Main event handler
 export async function handleEvent(event: line.WebhookEvent): Promise<any> {
@@ -49,7 +42,7 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
 async function handleQuery(parsedData: ParsedMessage): Promise<string> {
   if (parsedData.queryTarget === 'pet') {
     const petsData = await readSheet('Pets!A:B');
-    const pets = petsData ? petsData.map(p => `${p[0]} (${p[1] || '未知'})`).filter(Boolean) : [];
+    const pets = petsData ? petsData.map(p => `${p[PET_COLUMNS.NAME]} (${p[PET_COLUMNS.TYPE] || '未知'})`).filter(Boolean) : [];
     return pets.length > 0 ? `目前已記錄的寵物有：\n- ${pets.join('\n- ')}` : '目前沒有記錄任何寵物。';
   }
 
@@ -65,7 +58,7 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
 
     const filters = parsedData.queryFilters || {};
     const filteredEntries = diaryData.filter(entry => {
-      const entryDate = entry[DIARY_COLUMNS.TIME] ? entry[DIARY_COLUMNS.TIME].substring(0, 10) : '';
+      const entryDate = entry[DIARY_COLUMNS.TIME] ? entry[DIARY_COLUMNS.TIME].substring(0, DATE_FORMAT_LENGTHS.ISO_DATE) : '';
       const petMatch = !filters.petName || entry[DIARY_COLUMNS.PET_NAME] === filters.petName;
       const actionMatch = !filters.actionName || entry[DIARY_COLUMNS.ACTION] === filters.actionName;
       
@@ -77,10 +70,10 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
     });
 
     if (filteredEntries.length > 0) {
-      const formattedEntries = filteredEntries.slice(-10).map(entry => {
+      const formattedEntries = filteredEntries.slice(-UI_LIMITS.MAX_DIARY_QUERY).map(entry => {
         return `- [${entry[DIARY_COLUMNS.TIME]}] ${entry[DIARY_COLUMNS.PET_NAME]} ${entry[DIARY_COLUMNS.ACTION]}: ${entry[DIARY_COLUMNS.DESCRIPTION]}`;
       }).join('\n');
-      return `查詢結果 (最多顯示 10 筆)：\n${formattedEntries}`;
+      return `查詢結果 (最多顯示 ${UI_LIMITS.MAX_DIARY_QUERY} 筆)：\n${formattedEntries}`;
     }
     return '找不到符合條件的日記。';
   }
@@ -93,15 +86,15 @@ async function handleEdit(parsedData: ParsedMessage): Promise<string> {
     const petsData = await readSheet('Pets!A:B');
     if (!petsData) return '讀取資料失敗。';
     
-    const rowIndex = petsData.findIndex(row => row[0] === parsedData.petName);
+    const rowIndex = petsData.findIndex(row => row[PET_COLUMNS.NAME] === parsedData.petName);
     if (rowIndex === -1) return `找不到寵物「${parsedData.petName}」。`;
 
     const currentRow = petsData[rowIndex];
-    const newPetName = parsedData.newPetName || currentRow[0];
-    const newPetType = parsedData.newPetType || currentRow[1];
+    const newPetName = parsedData.newPetName || currentRow[PET_COLUMNS.NAME];
+    const newPetType = parsedData.newPetType || currentRow[PET_COLUMNS.TYPE];
     
     if (parsedData.newPetName && parsedData.newPetName !== parsedData.petName) {
-      if (petsData.some(row => row[0] === parsedData.newPetName)) {
+      if (petsData.some(row => row[PET_COLUMNS.NAME] === parsedData.newPetName)) {
         return `更新失敗：名稱「${parsedData.newPetName}」已存在。`;
       }
     }
