@@ -12,7 +12,7 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 async function getGoogleSheetClient(): Promise<sheets_v4.Sheets> {
   const privateKey = process.env.GOOGLE_PRIVATE_KEY
-    ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"(.*)"$/, '$1')
+    ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"(.*)"$/, '$1').trim()
     : undefined;
 
   const credentials = {
@@ -20,9 +20,17 @@ async function getGoogleSheetClient(): Promise<sheets_v4.Sheets> {
     private_key: privateKey,
   };
 
+  // 檢查環境變數是否完整且私鑰格式正確 (包含 PEM 標記)
+  const isEnvValid = !!(
+    credentials.client_email && 
+    credentials.private_key && 
+    credentials.private_key.includes('BEGIN PRIVATE KEY')
+  );
+
   const auth = new GoogleAuth({
-    credentials: credentials.client_email && credentials.private_key ? credentials : undefined,
-    keyFile: !credentials.client_email ? 'service-account.json' : undefined,
+    credentials: isEnvValid ? credentials : undefined,
+    // 如果環境變數不完全，則嘗試讀取本地檔案
+    keyFile: isEnvValid ? undefined : 'service-account.json',
     scopes: SCOPES,
   });
 
