@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google-generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ParsedMessage {
   intent: 'add_diary' | 'add_pet' | 'query_diary' | 'unknown';
