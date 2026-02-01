@@ -14,7 +14,7 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
   switch (event.type) {
     case 'message':
       if (event.message.type === 'text') {
-        return handleTextMessage(event);
+        return handleTextMessage(event as line.MessageEvent & { message: line.TextEventMessage });
       }
       break;
     case 'postback':
