@@ -11,9 +11,6 @@ if (!SPREADSHEET_ID) {
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 async function getGoogleSheetClient(): Promise<sheets_v4.Sheets> {
-  console.log('DEBUG: GOOGLE_SERVICE_ACCOUNT_EMAIL:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
-  console.log('DEBUG: GOOGLE_PRIVATE_KEY:', process.env.GOOGLE_PRIVATE_KEY);
-  
   const auth = new GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
