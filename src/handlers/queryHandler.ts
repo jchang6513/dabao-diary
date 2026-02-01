@@ -1,11 +1,11 @@
 import { ParsedMessage } from '../gemini';
-import { PetService } from '../services/pet.service';
-import { ActionService } from '../services/action.service';
-import { DiaryService } from '../services/diary.service';
+import { PetService } from '../services/petService';
+import { ActionService } from '../services/actionService';
+import { DiaryService } from '../services/diaryService';
 import { DIARY_COLUMNS, PET_COLUMNS, DATE_FORMAT_LENGTHS } from '../constants';
 import { MessageUI } from './messages';
 
-export async function handleQueryIntent(parsedData: ParsedMessage): Promise<string> {
+export async function handleQueryMsg(parsedData: ParsedMessage): Promise<string> {
   if (parsedData.queryTarget === 'pet') {
     const pets = await PetService.getPetsWithInfo();
     const list = pets.map(p => `${p[PET_COLUMNS.NAME]} (${p[PET_COLUMNS.TYPE] || '未知'})`).filter(Boolean);

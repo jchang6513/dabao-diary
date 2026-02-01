@@ -1,10 +1,10 @@
 import { LineBotContext } from '../context';
-import { PetService } from '../services/pet.service';
-import { ActionService } from '../services/action.service';
-import { DiaryService } from '../services/diary.service';
+import { PetService } from '../services/petService';
+import { ActionService } from '../services/actionService';
+import { DiaryService } from '../services/diaryService';
 import { MessageUI } from './messages';
 
-export async function handlePostbackIntent(ctx: LineBotContext, data: URLSearchParams): Promise<any> {
+export async function handlePostbackMsg(ctx: LineBotContext, data: URLSearchParams): Promise<any> {
   const action = data.get('action');
   
   if (action === 'cancel') return ctx.sendText(MessageUI.cancel());

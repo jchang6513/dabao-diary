@@ -1,9 +1,9 @@
 import { ParsedMessage } from '../gemini';
 import { LineBotContext } from '../context';
-import { PetService } from '../services/pet.service';
+import { PetService } from '../services/petService';
 import { MessageUI } from './messages';
 
-export async function handleAddIntent(ctx: LineBotContext, parsed: ParsedMessage): Promise<any> {
+export async function handleAddMsg(ctx: LineBotContext, parsed: ParsedMessage): Promise<any> {
   if (parsed.intent === 'add_pet' && parsed.petName) {
     if (await PetService.exists(parsed.petName)) {
       return ctx.sendText(MessageUI.petAlreadyExists(parsed.petName));

@@ -1,10 +1,10 @@
 import { ParsedMessage } from '../gemini';
-import { PetService } from '../services/pet.service';
-import { DiaryService } from '../services/diary.service';
+import { PetService } from '../services/petService';
+import { DiaryService } from '../services/diaryService';
 import { DIARY_COLUMNS, PET_COLUMNS } from '../constants';
 import { MessageUI } from './messages';
 
-export async function handleEditIntent(parsedData: ParsedMessage): Promise<string> {
+export async function handleEditMsg(parsedData: ParsedMessage): Promise<string> {
   if (parsedData.editTarget === 'pet' && parsedData.petName) {
     const pets = await PetService.getPetsWithInfo();
     const rowIndex = pets.findIndex(row => row[PET_COLUMNS.NAME] === parsedData.petName);
