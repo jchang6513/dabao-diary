@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "ES2023",
+    "lib": ["ES2023"],
     "module": "commonjs",
     "outDir": "dist",
     "rootDir": "src",
