@@ -50,59 +50,35 @@ export async function parseMessageWithGemini(
     };
   }
 
-  const petList = pets.length > 0 ? pets.join(', ') : '尚未定義寵物';
-  const actionList = actions.length > 0 ? actions.join(', ') : '尚未定義動作';
+  const petList = pets.length > 0 ? pets.join(',') : '無';
+  const actionList = actions.length > 0 ? actions.join(',') : '無';
   const now = new Date();
   const today = now.toISOString().split('T')[0];
-  const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
+  const currentTime = now.toTimeString().substring(0, 5);
 
   const prompt = `
-  你是一個寵物日記助手。請分析使用者的訊息並判斷其意圖。
-  所有的回應都必須使用正體中文。
+你視為寵物日記助手，負責分析訊息並回傳 JSON。
+現況：日期 ${today}，時間 ${currentTime}，寵物 [${petList}]，動作 [${actionList}]。
 
-  使用者的訊息：「${message}」
-  已知的寵物：[${petList}]
-  已知的動作：[${actionList}]
-  今天是 ${today}，現在時間是 ${currentTime}。
+意圖與 JSON 欄位：
+- 'add_diary': {intent, petName, action, description, time}
+- 'add_pet': {intent, petName, petType}
+- 'query': {intent, queryTarget, queryFilters: {petName, actionName, startDate, endDate}}
+- 'edit': {intent, editTarget('pet'|'diary'), petName, time, newPetName, newPetType, newAction, newDescription, newTime}
+- 'unknown': {intent, clarificationPrompt}
 
-  意圖分類：
-  1. 'add_diary': 記錄寵物事件 (例如：「大寶三點在睡覺」)。
-  2. 'add_pet': 新增寵物。
-  3. 'query': 查詢資訊 (例如：「大寶今天做了什麼」)。
-  4. 'edit': 修改「已存在」的資訊。這包含：
-     - 修改寵物資訊 (例如：「把小雞的種類改成貓」)。
-     - 修改日記內容 (例如：「把大寶剛才的時間改成 12:00」、「大寶剛才的動作應該是吃飯不是睡覺」、「把剛才那筆的描述改為好乖」)。
-  5. 'unknown': 不明或問候。
+規則：
+1. 僅回傳 JSON。
+2. 語系：正體中文。
+3. 'edit' 若未指名時間，視為修改「最近一筆」。
+4. 時間格式：YYYY-MM-DD HH:mm。
 
-  對於 'edit' 意圖：
-  - 如果使用者提到「剛才」、「最後一筆」，請將 "petName" 設為該寵物的名字（如果訊息中有提到），且不需指定 "time"。
-  - 如果訊息中包含新的時間、動作或描述，請分別填入 "newTime", "newAction", "newDescription"。
-  - 如果要修改寵物名字，請填入 "newPetName"。
+範例：
+- 「大寶12:00在睡覺」-> {"intent":"add_diary","petName":"大寶","action":"睡覺","time":"${today} 12:00"}
+- 「修改大寶剛才的時間為13:00」-> {"intent":"edit","editTarget":"diary","petName":"大寶","newTime":"${today} 13:00"}
+- 「大寶今天做了什麼」-> {"intent":"query","queryTarget":"diary","queryFilters":{"petName":"大寶","startDate":"${today}"}}
 
-  請根據意圖提取資訊並回傳 JSON 格式：
-
-  - "intent": 意圖。
-  - "petName": 寵物名稱 (修改日記時指目標寵物)。
-  - "petType": 寵物種類 (新增寵物時使用)。
-  - "action": 原本的動作 (若有提到)。
-  - "description": 原本的描述 (若有提到)。
-  - "time": 原本的時間 (若有提到，用來定位日記)。
-  - "editTarget": 編輯對象 ('pet' 或 'diary')。
-  - "newPetName": 新的寵物名稱。
-  - "newPetType": 新的寵物種類。
-  - "newAction": 新的動作。
-  - "newDescription": 新的描述。
-  - "newTime": 新的時間 (格式 YYYY-MM-DD HH:mm，若只有時間則補上今日日期)。
-  - "queryTarget": 查詢對象。
-  - "queryFilters": 查詢過濾條件。
-  - "clarificationPrompt": 如果資訊不足以判斷意圖，請在此提供親切的引導詢問。
-
-  範例：
-  - 「把大寶剛才的時間改為 12:00」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "newTime": "${today} 12:00"}
-  - 「大寶剛才不是睡覺是在吃飯」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "newAction": "吃飯"}
-  - 「修改剛剛那筆描述為超級可愛」 -> {"intent": "edit", "editTarget": "diary", "newDescription": "超級可愛"}
-
-  請只回傳 JSON 物件。
+訊息：「${message}」
   `;
 
   try {
