@@ -38,8 +38,10 @@ LINE_CHANNEL_SECRET=你的_SECRET
 
 # Google Sheets
 GOOGLE_SHEET_ID=試算表的_ID
-# 建議將金鑰內容填入或指定路徑
-# 專案目前讀取根目錄的 service-account.json
+GOOGLE_SERVICE_ACCOUNT_EMAIL=你的_SERVICE_ACCOUNT_EMAIL
+GOOGLE_PRIVATE_KEY="你的_PRIVATE_KEY" # 包含 \n 的完整字串
+# 註：若在本地開發且有 service-account.json，程式會優先使用 JSON 檔案。
+# 但在 Vercel 部署時，請務必設定上述環境變數。
 
 # Google Gemini API
 GEMINI_API_KEY=你的_GEMINI_API_KEY
