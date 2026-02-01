@@ -16,11 +16,46 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
       if (event.message.type === 'text') {
         return handleTextMessage(event as line.MessageEvent & { message: line.TextEventMessage });
       }
+      if (event.message.type === 'image') {
+        return handleImageMessage(event as line.MessageEvent & { message: line.ImageEventMessage });
+      }
       break;
     case 'postback':
       return handlePostback(event);
     default:
       return Promise.resolve(null);
+  }
+}
+
+async function handleImageMessage(event: line.MessageEvent & { message: line.ImageEventMessage }): Promise<any> {
+  try {
+    // In a real application, you would download the image using client.getMessageContent(event.message.id)
+    // and upload it to a storage service (S3, Cloudinary, etc.) to get a public URL.
+    // For this prototype, we will store the LINE Message ID as a placeholder for the image reference.
+    
+    const imageId = event.message.id;
+    const diaryData = await readSheet('Diary!A:E'); // Now A:E to include image column
+    
+    if (!diaryData || diaryData.length === 0) {
+      return client.replyMessage(event.replyToken, { type: 'text', text: '找不到可以關聯照片的日記，請先新增一筆日記。' });
+    }
+
+    // Find the last entry (the one the user most likely just added)
+    const lastIndex = diaryData.length - 1;
+    const lastEntry = diaryData[lastIndex];
+    
+    // Update the 5th column (Index 4) with the image ID
+    // Note: Diary sheet should have columns: Pet, Action, Description, Time, Image
+    const updatedRow = [...lastEntry];
+    updatedRow[4] = imageId; // Store the ID or URL
+
+    await updateSheet(`Diary!A${lastIndex + 1}:E${lastIndex + 1}`, [updatedRow]);
+    
+    return client.replyMessage(event.replyToken, { type: 'text', text: `照片已成功關聯至「${lastEntry[0]}」的最後一筆日記！` });
+
+  } catch (error) {
+    console.error('Error handling image message:', error);
+    return client.replyMessage(event.replyToken, { type: 'text', text: '處理照片時發生錯誤。' });
   }
 }
 
@@ -39,7 +74,7 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
   }
 
   if (parsedData.queryTarget === 'diary') {
-    const diaryData = await readSheet('Diary!A:D');
+    const diaryData = await readSheet('Diary!A:E');
     if (!diaryData || diaryData.length === 0) return '目前沒有任何日記。';
 
     const filters = parsedData.queryFilters || {};
@@ -56,9 +91,10 @@ async function handleQuery(parsedData: ParsedMessage): Promise<string> {
     });
 
     if (filteredEntries.length > 0) {
-      const formattedEntries = filteredEntries.slice(-10).map(entry => 
-        `- [${entry[3]}] ${entry[0]} ${entry[1]}: ${entry[2]}`
-      ).join('\n');
+      const formattedEntries = filteredEntries.slice(-10).map(entry => {
+        const hasImage = entry[4] ? ' [有照片]' : '';
+        return `- [${entry[3]}] ${entry[0]} ${entry[1]}: ${entry[2]}${hasImage}`;
+      }).join('\n');
       return `查詢結果 (最多顯示 10 筆)：\n${formattedEntries}`;
     }
     return '找不到符合條件的日記。';
