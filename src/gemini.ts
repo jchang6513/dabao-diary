@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google-generative-ai';
 
 export interface ParsedMessage {
   intent: 'add_diary' | 'add_pet' | 'query_diary' | 'unknown';
@@ -8,6 +8,7 @@ export interface ParsedMessage {
   queryPetName: string | null;
   queryAction: string | null;
   queryDate: string | null;
+  clarificationPrompt: string | null;
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -30,7 +31,7 @@ export async function parseMessageWithGemini(
     return {
       intent: 'unknown',
       petName: null, action: null, description: message,
-      queryPetName: null, queryAction: null, queryDate: null,
+      queryPetName: null, queryAction: null, queryDate: null, clarificationPrompt: null,
     };
   }
 
@@ -48,36 +49,27 @@ export async function parseMessageWithGemini(
   Today's date is ${today}.
 
   First, determine the user's intent. The intent can be one of four things:
-  1. 'add_diary': The user is describing an event for a pet. (e.g., "大寶剛剛拉屎", "開罐罐給肉包吃"). This is the most common intent.
+  1. 'add_diary': The user is describing an event for a pet. (e.g., "大寶剛剛拉屎", "開罐罐給肉包吃").
   2. 'add_pet': The user is introducing a new pet. (e.g., "Add a new cat, 小雞").
-  3. 'query_diary': The user is asking to see diary entries. (e.g., "大寶的日記", "今天做了什麼", "肉包什麼時候去看醫生").
+  3. 'query_diary': The user is asking to see diary entries. (e.g., "大寶的日記", "今天做了什麼").
   4. 'unknown': The intent is not clear or is a simple greeting.
 
   Based on the intent, extract the following information and return it as a valid JSON object.
   
   - "intent": The intent you determined.
   
-  - For 'add_diary':
-    - "petName": The name of the pet from the known pet list.
-    - "action": Categorize the action.
-    - "description": A concise summary of the event.
+  - For 'add_diary', 'add_pet', and 'query_diary', fill the relevant fields as before.
   
-  - For 'add_pet':
-    - "petName": The name of the new pet.
-  
-  - For 'query_diary':
-    - "queryPetName": The pet name to filter by, if mentioned.
-    - "queryAction": The action to filter by, if mentioned.
-    - "queryDate": The date to filter by, in YYYY-MM-DD format. If relative dates like '今天' (today) or '昨天' (yesterday) are used, convert them.
+  - For 'unknown' intent:
+    - All fields should be null EXCEPT for 'intent' and 'clarificationPrompt'.
+    - "clarificationPrompt": Generate a friendly, helpful question in Chinese to ask the user what they want to do. The question should hint at the bot's capabilities (logging, querying, adding pets).
   
   Set any unused fields for a given intent to null.
 
   Examples:
-  - Message: "大寶剛剛拉屎" -> {"intent": "add_diary", "petName": "大寶", "action": "poop", "description": "剛剛拉屎", "queryPetName": null, "queryAction": null, "queryDate": null}
-  - Message: "Add a new cat, 小雞" -> {"intent": "add_pet", "petName": "小雞", "action": null, "description": null, "queryPetName": null, "queryAction": null, "queryDate": null}
-  - Message: "大寶的日記" -> {"intent": "query_diary", "petName": null, "action": null, "description": null, "queryPetName": "大寶", "queryAction": null, "queryDate": null}
-  - Message: "今天做了什麼" -> {"intent": "query_diary", "petName": null, "action": null, "description": null, "queryPetName": null, "queryAction": null, "queryDate": "${today}"}
-  - Message: "hi" -> {"intent": "unknown", "petName": null, "action": null, "description": null, "queryPetName": null, "queryAction": null, "queryDate": null}
+  - Message: "大寶剛剛拉屎" -> {"intent": "add_diary", "petName": "大寶", "action": "poop", "description": "剛剛拉屎", "queryPetName": null, "queryAction": null, "queryDate": null, "clarificationPrompt": null}
+  - Message: "大寶的日記" -> {"intent": "query_diary", "petName": null, "action": null, "description": null, "queryPetName": "大寶", "queryAction": null, "queryDate": null, "clarificationPrompt": null}
+  - Message: "hi" -> {"intent": "unknown", "petName": null, "action": null, "description": null, "queryPetName": null, "queryAction": null, "queryDate": null, "clarificationPrompt": "您好！需要我為您記錄寵物日記、查詢資料、還是新增寵物嗎？"}
   
   The output should ONLY be a valid JSON object.
   `;
@@ -96,17 +88,18 @@ export async function parseMessageWithGemini(
       intent: parsed.intent || 'unknown',
       petName: parsed.petName || null,
       action: parsed.action || null,
-      description: parsed.description || (parsed.intent === 'unknown' ? message : null),
+      description: parsed.description || null,
       queryPetName: parsed.queryPetName || null,
       queryAction: parsed.queryAction || null,
       queryDate: parsed.queryDate || null,
+      clarificationPrompt: parsed.clarificationPrompt || null,
     };
   } catch (error) {
     console.error('Error calling Gemini API or parsing response:', error);
     return {
       intent: 'unknown',
       petName: null, action: null, description: message,
-      queryPetName: null, queryAction: null, queryDate: null,
+      queryPetName: null, queryAction: null, queryDate: null, clarificationPrompt: "抱歉，我這裡有點問題，請稍後再試一次。",
     };
   }
 }

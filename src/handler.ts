@@ -117,7 +117,8 @@ async function handleTextMessage(event: line.MessageEvent & { message: line.Text
       confirmationText = `要新增一隻新的寵物「${parsedData.petName}」嗎？`;
       postbackData = `action=add_pet&petName=${encodeURIComponent(parsedData.petName)}`;
     } else {
-      return client.replyMessage(event.replyToken, { type: 'text', text: "抱歉，我不太懂您的意思，可以換句話說嗎？" });
+      const reply = parsedData.clarificationPrompt || "抱歉，我不太懂您的意思，可以換句話說嗎？";
+      return client.replyMessage(event.replyToken, { type: 'text', text: reply });
     }
 
     const confirmTemplate: line.TemplateMessage = {
