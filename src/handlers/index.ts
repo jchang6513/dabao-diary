@@ -1,12 +1,13 @@
 import * as line from '@line/bot-sdk';
-import { parseMessageWithGemini } from './gemini';
-import { LineBotContext } from './context';
-import { PetService } from './services/pet.service';
-import { ActionService } from './services/action.service';
-import { handleQueryIntent } from './intents/query';
-import { handleEditIntent } from './intents/edit';
-import { handleAddIntent } from './intents/add';
-import { handlePostbackIntent } from './intents/postback';
+import { parseMessageWithGemini } from '../gemini';
+import { LineBotContext } from '../context';
+import { PetService } from '../services/pet.service';
+import { ActionService } from '../services/action.service';
+import { handleQueryIntent } from './query';
+import { handleEditIntent } from './edit';
+import { handleAddIntent } from './add';
+import { handlePostbackIntent } from './postback';
+import { MessageUI } from './messages';
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -28,7 +29,7 @@ export async function handleEvent(event: line.WebhookEvent): Promise<any> {
     }
   } catch (error) {
     console.error('Handler Error:', error);
-    return ctx.sendText('抱歉，處理您的請求時發生錯誤。');
+    return ctx.sendText(MessageUI.error());
   }
 }
 
@@ -46,6 +47,6 @@ async function handleTextMessage(ctx: LineBotContext, event: line.MessageEvent &
     case 'add_diary':
       return handleAddIntent(ctx, parsed);
     default:
-      return ctx.sendText(parsed.clarificationPrompt || "抱歉，我不太懂您的意思，可以再說清楚一點嗎？");
+      return ctx.sendText(MessageUI.clarification(parsed.clarificationPrompt));
   }
 }

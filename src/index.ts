@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import * as line from '@line/bot-sdk';
-import { handleEvent } from './handler';
+import { handleEvent } from './handlers';
 import { DEFAULT_PORT, HTTP_STATUS } from './constants';
 
 // create LINE SDK config from env variables

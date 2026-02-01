@@ -1,0 +1,48 @@
+import { UI_LIMITS } from '../constants';
+
+/**
+ * 集中管理所有的回覆訊息模板
+ */
+export const MessageUI = {
+  // 查詢相關
+  petList: (pets: string[]) => 
+    pets.length > 0 ? `目前已記錄的寵物有：\n- ${pets.join('\n- ')}` : '目前沒有記錄任何寵物。',
+  
+  actionList: (actions: string[]) => 
+    actions.length > 0 ? `目前已設定的動作有：\n- ${actions.join('\n- ')}` : '目前沒有設定任何動作。',
+  
+  diaryEntries: (entries: string[]) => 
+    entries.length > 0 
+      ? `查詢結果 (最多顯示 ${UI_LIMITS.MAX_DIARY_QUERY} 筆)：\n${entries.join('\n')}` 
+      : '找不到符合條件的日記。',
+  
+  noDiaryFound: () => '目前沒有任何日記。',
+  queryUnclear: () => '抱歉，我不確定您想查詢什麼。',
+
+  // 編輯相關
+  petUpdated: (oldName: string, newName: string, newType: string) => 
+    `已更新寵物「${oldName}」的資訊為：${newName} (${newType})`,
+  
+  petUpdateFailedDuplicate: (name: string) => `更新失敗：名稱「${name}」已存在。`,
+  petNotFound: (name: string) => `找不到寵物「${name}」。`,
+  
+  diaryUpdated: (changes: string[]) => `已更新日記內容：\n${changes.join('\n')}`,
+  diaryUpdateNoChanges: () => '未偵測到需要修改的內容。',
+  diaryNotFound: () => '找不到符合條件的日記。',
+  editUnclear: () => '抱歉，我不確定您想修改什麼。',
+
+  // 新增相關
+  confirmAddPet: (name: string, type: string) => `確定要新增寵物嗎？\n名稱：${name}\n種類：${type}`,
+  petAlreadyExists: (name: string) => `寵物「${name}」已經存在囉！`,
+  petAdded: (name: string) => `已成功新增寵物：${name}`,
+
+  confirmAddDiary: (action: string, description: string, time: string, petName: string) => 
+    `請確認日記內容：\n事件：${action}\n描述：${description || '無'}\n時間：${time}\n寵物：${petName}`,
+  diarySaved: () => '日記已成功儲存！',
+
+  // 系統相關
+  cancel: () => '已取消操作。',
+  modifyRequest: () => '好的，請直接輸入正確的內容，我會重新為您解析。',
+  error: () => '抱歉，處理您的請求時發生錯誤。',
+  clarification: (prompt?: string | null) => prompt || "抱歉，我不太懂您的意思，可以再說清楚一點嗎？"
+};

@@ -2,27 +2,28 @@ import { ParsedMessage } from '../gemini';
 import { PetService } from '../services/pet.service';
 import { DiaryService } from '../services/diary.service';
 import { DIARY_COLUMNS, PET_COLUMNS } from '../constants';
+import { MessageUI } from './messages';
 
 export async function handleEditIntent(parsedData: ParsedMessage): Promise<string> {
   if (parsedData.editTarget === 'pet' && parsedData.petName) {
     const pets = await PetService.getPetsWithInfo();
     const rowIndex = pets.findIndex(row => row[PET_COLUMNS.NAME] === parsedData.petName);
-    if (rowIndex === -1) return `找不到寵物「${parsedData.petName}」。`;
+    if (rowIndex === -1) return MessageUI.petNotFound(parsedData.petName);
 
     const newName = parsedData.newPetName || pets[rowIndex][PET_COLUMNS.NAME];
     const newType = parsedData.newPetType || pets[rowIndex][PET_COLUMNS.TYPE];
 
     if (parsedData.newPetName && parsedData.newPetName !== parsedData.petName && await PetService.exists(parsedData.newPetName)) {
-      return `更新失敗：名稱「${parsedData.newPetName}」已存在。`;
+      return MessageUI.petUpdateFailedDuplicate(parsedData.newPetName);
     }
 
     await PetService.updatePet(parsedData.petName, newName, newType);
-    return `已更新寵物「${parsedData.petName}」的資訊為：${newName} (${newType})`;
+    return MessageUI.petUpdated(parsedData.petName, newName, newType);
   }
 
   if (parsedData.editTarget === 'diary') {
     const entry = await DiaryService.findEntry(parsedData.petName, parsedData.time);
-    if (!entry) return '找不到符合條件的日記。';
+    if (!entry) return MessageUI.diaryNotFound();
 
     const updatedRow = [...entry.data];
     const changes: string[] = [];
@@ -31,9 +32,9 @@ export async function handleEditIntent(parsedData: ParsedMessage): Promise<strin
     if (parsedData.newAction) { updatedRow[DIARY_COLUMNS.ACTION] = parsedData.newAction; changes.push(`動作：${parsedData.newAction}`); }
     if (parsedData.newDescription) { updatedRow[DIARY_COLUMNS.DESCRIPTION] = parsedData.newDescription; changes.push(`描述：${parsedData.newDescription}`); }
 
-    if (changes.length === 0) return '未偵測到需要修改的內容。';
+    if (changes.length === 0) return MessageUI.diaryUpdateNoChanges();
     await DiaryService.updateEntry(entry.index, updatedRow);
-    return `已更新日記內容：\n${changes.join('\n')}`;
+    return MessageUI.diaryUpdated(changes);
   }
-  return '抱歉，我不確定您想修改什麼。';
+  return MessageUI.editUnclear();
 }
