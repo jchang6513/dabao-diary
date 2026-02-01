@@ -1,12 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface ParsedMessage {
-  intent: 'add_diary' | 'add_pet' | 'query' | 'unknown';
+  intent: 'add_diary' | 'add_pet' | 'query' | 'edit' | 'unknown';
   petName: string | null;
-  petType: string | null; // For 'add_pet'
+  petType: string | null;
   action: string | null;
   description: string | null;
   time: string | null;
+  // For 'edit' intent
+  editTarget: 'pet' | 'diary' | null;
+  newPetName?: string | null;
+  newPetType?: string | null;
+  newAction?: string | null;
+  newDescription?: string | null;
+  newTime?: string | null;
+  // For 'query' intent
   queryTarget: 'pet' | 'action' | 'diary' | null;
   queryFilters: {
     petName?: string | null;
@@ -37,6 +45,7 @@ export async function parseMessageWithGemini(
     return {
       intent: 'unknown',
       petName: null, petType: null, action: null, description: message, time: null,
+      editTarget: null,
       queryTarget: null, queryFilters: null, clarificationPrompt: null,
     };
   }
@@ -57,32 +66,33 @@ export async function parseMessageWithGemini(
   今天是 ${today}，現在時間是 ${currentTime}。
 
   意圖分類：
-  1. 'add_diary': 記錄寵物事件 (如：「大寶剛剛拉屎」、「三點給肉包吃罐罐」)。
-  2. 'add_pet': 新增寵物 (如：「新養了一隻貓叫小雞」、「新增狗狗大福」)。
-  3. 'query': 查詢資訊 (如：「大寶的日記」、「最近有什麼動作」、「列出所有寵物」、「昨天肉包吃了什麼」)。
-  4. 'unknown': 不明或問候。
+  1. 'add_diary': 記錄寵物事件。
+  2. 'add_pet': 新增寵物。
+  3. 'query': 查詢資訊。
+  4. 'edit': 編輯現有資訊 (如：「將小雞的種類改為蛇」、「把大寶剛才的描述改為好乖」)。
+  5. 'unknown': 不明或問候。
 
   請根據意圖提取資訊並回傳 JSON 格式：
 
   - "intent": 意圖。
   - "petName": 寵物名稱。
-  - "petType": 寵物種類 (僅用於 add_pet，如：貓、狗、蛇)。
-  - "action": 動作類型 (如：進食、排泄、睡覺)。
+  - "petType": 寵物種類。
+  - "action": 動作類型。
   - "description": 詳細描述。
-  - "time": 事件發生的時間或日期時間 (ISO 8601 格式或 YYYY-MM-DD HH:mm)。
-  - "queryTarget": 查詢對象 ('pet', 'action', 'diary')。
-  - "queryFilters": 查詢過濾條件 (包含 petName, actionName, startDate, endDate)。
-  - "clarificationPrompt": 當意圖為 unknown 時，產生的親切引導詢問。
+  - "time": 時間。
+  - "editTarget": 編輯對象 ('pet', 'diary')。
+  - "newPetName", "newPetType", "newAction", "newDescription", "newTime": 編輯後的新值。
+  - "queryTarget": 查詢對象。
+  - "queryFilters": 查詢過濾條件。
+  - "clarificationPrompt": 引導詢問。
 
   範例：
-  - 「大寶三點拉屎」 -> {"intent": "add_diary", "petName": "大寶", "action": "排泄", "description": "拉屎", "time": "${today} 15:00", "queryTarget": null, "queryFilters": null, "clarificationPrompt": null}
-  - 「新養了一隻貓叫小雞」 -> {"intent": "add_pet", "petName": "小雞", "petType": "貓", "action": null, "description": null, "time": null, "queryTarget": null, "queryFilters": null, "clarificationPrompt": null}
-  - 「大寶昨天的日記」 -> {"intent": "query", "petName": null, "petType": null, "action": null, "description": null, "time": null, "queryTarget": "diary", "queryFilters": {"petName": "大寶", "startDate": "昨天日期", "endDate": "昨天日期"}, "clarificationPrompt": null}
-  - 「有什麼寵物」 -> {"intent": "query", "petName": null, "petType": null, "action": null, "description": null, "time": null, "queryTarget": "pet", "queryFilters": null, "clarificationPrompt": null}
+  - 「修改小雞的種類為蛇」 -> {"intent": "edit", "editTarget": "pet", "petName": "小雞", "newPetType": "蛇"}
+  - 「把大寶剛才的描述改成在睡覺」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "newDescription": "在睡覺"}
+  - 「將大寶下午三點的動作改為吃飯」 -> {"intent": "edit", "editTarget": "diary", "petName": "大寶", "time": "${today} 15:00", "newAction": "吃飯"}
 
   注意：
-  - 如果使用者沒提到時間，add_diary 的 time 預設為現在：「${today} ${currentTime}」。
-  - 查詢昨天的日期請根據 ${today} 計算。
+  - 如果是編輯日記但沒指定時間，通常指「最近的一筆」。
   - 請只回傳 JSON 物件。
   `;
 
@@ -103,6 +113,12 @@ export async function parseMessageWithGemini(
       action: parsed.action || null,
       description: parsed.description || null,
       time: parsed.time || null,
+      editTarget: parsed.editTarget || null,
+      newPetName: parsed.newPetName || null,
+      newPetType: parsed.newPetType || null,
+      newAction: parsed.newAction || null,
+      newDescription: parsed.newDescription || null,
+      newTime: parsed.newTime || null,
       queryTarget: parsed.queryTarget || null,
       queryFilters: parsed.queryFilters || null,
       clarificationPrompt: parsed.clarificationPrompt || null,
@@ -112,6 +128,7 @@ export async function parseMessageWithGemini(
     return {
       intent: 'unknown',
       petName: null, petType: null, action: null, description: message, time: null,
+      editTarget: null,
       queryTarget: null, queryFilters: null, clarificationPrompt: "抱歉，我這裡有點問題，請稍後再試一次。",
     };
   }

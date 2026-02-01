@@ -49,3 +49,20 @@ export async function appendSheet(range: string, values: any[][]): Promise<void>
     console.error('Error appending to Google Sheet:', error);
   }
 }
+
+export async function updateSheet(range: string, values: any[][]): Promise<void> {
+  try {
+    const sheets = await getGoogleSheetClient();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: values,
+      },
+    });
+    console.log('Updated Google Sheet successfully.');
+  } catch (error) {
+    console.error('Error updating Google Sheet:', error);
+  }
+}
