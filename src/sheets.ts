@@ -19,12 +19,7 @@ async function getGoogleSheetClient(): Promise<sheets_v4.Sheets> {
     scopes: SCOPES,
   });
 
-  const authClient = await auth.getClient();
-  if (!authClient) {
-    throw new Error('Failed to get authenticated client for Google Sheets.');
-  }
-
-  return google.sheets({ version: 'v4', auth: authClient });
+  return google.sheets({ version: 'v4', auth });
 }
 
 export async function readSheet(range: string): Promise<string[][] | null | undefined> {
