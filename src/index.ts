@@ -26,6 +26,10 @@ app.post('/webhook', line.middleware(config), (req: Request, res: Response) => {
 
 // listen on port
 const port = process.env.PORT || DEFAULT_PORT;
-app.listen(port, () => {
-  console.log(`listening on ${port}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`listening on ${port}`);
+  });
+}
+
+export default app;
