@@ -44,5 +44,11 @@ export const MessageUI = {
   cancel: () => '已取消操作。',
   modifyRequest: () => '好的，請直接輸入正確的內容，我會重新為您解析。',
   error: () => '抱歉，處理您的請求時發生錯誤。',
-  clarification: (prompt?: string | null) => prompt || "抱歉，我不太懂您的意思，可以再說清楚一點嗎？"
+  clarification: (prompt?: string | null) => 
+    prompt || `我暫時還沒理解您的意思，您可以試著這樣說說看：
+
+🐾 記錄內容：「大寶 12:00 吃飯」
+🔍 查詢紀錄：「大寶今天做了什麼？」
+🐱 管理寵物：「新增一隻叫肉包的貓」
+✏️ 修改資料：「修改剛才的描述為好乖」`
 };
