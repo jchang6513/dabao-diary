@@ -1,8 +1,7 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import * as line from '@line/bot-sdk';
 import { handleEvent } from './handler';
-
-require('dotenv').config();
 
 // create LINE SDK config from env variables
 const config: line.MiddlewareConfig = {
