@@ -39,15 +39,15 @@ export async function parseMessageWithGemini(
   message: string,
   pets: string[],
   actions: string[]
-): Promise<ParsedMessage> {
+): Promise<ParsedMessage[]> {
   if (!GEMINI_API_KEY) {
     console.warn('GEMINI_API_KEY is missing. Returning placeholder data.');
-    return {
+    return [{
       intent: 'unknown',
       petName: null, petType: null, action: null, description: message, time: null,
       editTarget: null,
       queryTarget: null, queryFilters: null, clarificationPrompt: null,
-    };
+    }];
   }
 
   const petList = pets.length > 0 ? pets.join(',') : '無';
@@ -68,7 +68,7 @@ export async function parseMessageWithGemini(
 - 'unknown': {intent, clarificationPrompt}
 
 規則：
-1. 僅回傳 JSON。
+1. 僅回傳 JSON (若有多個意圖請用陣列)。
 2. 語系：正體中文。
 3. 'edit' 若未指名時間，視為修改「最近一筆」。
 4. 時間格式：YYYY-MM-DD HH:mm。
@@ -94,9 +94,10 @@ export async function parseMessageWithGemini(
     console.log('Gemini raw response:', text);
 
     const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanedText);
+    const rawParsed = JSON.parse(cleanedText);
+    const parsedArray = Array.isArray(rawParsed) ? rawParsed : [rawParsed];
 
-    return {
+    return parsedArray.map(parsed => ({
       intent: parsed.intent || 'unknown',
       petName: parsed.petName || null,
       petType: parsed.petType || null,
@@ -112,14 +113,14 @@ export async function parseMessageWithGemini(
       queryTarget: parsed.queryTarget || null,
       queryFilters: parsed.queryFilters || null,
       clarificationPrompt: parsed.clarificationPrompt || null,
-    };
+    }));
   } catch (error) {
     console.error('Error calling Gemini API or parsing response:', error);
-    return {
+    return [{
       intent: 'unknown',
       petName: null, petType: null, action: null, description: message, time: null,
       editTarget: null,
       queryTarget: null, queryFilters: null, clarificationPrompt: "抱歉，我這裡有點問題，請稍後再試一次。",
-    };
+    }];
   }
 }

@@ -40,6 +40,17 @@ export const MessageUI = {
     `請確認日記內容：\n事件：${action}\n描述：${description || '無'}\n時間：${time}\n寵物：${petName}`,
   diarySaved: () => '日記已成功儲存！',
 
+  // 多重新增相關
+  confirmMultiAddPet: (pets: {name: string, type: string}[]) => {
+    const list = pets.map(p => `- ${p.name} (${p.type || '未知'})`).join('\n');
+    return `確定要新增以下 ${pets.length} 隻寵物嗎？\n${list}`;
+  },
+  
+  confirmMultiAddDiary: (entries: {petName: string, action: string, time: string}[]) => {
+    const list = entries.map(e => `- ${e.petName}: ${e.action} (${e.time})`).join('\n');
+    return `請確認以下 ${entries.length} 筆日記內容：\n${list}\n\n確定要全部儲存嗎？`;
+  },
+
   // 系統相關
   cancel: () => '已取消操作。',
   modifyRequest: () => '好的，請直接輸入正確的內容，我會重新為您解析。',
