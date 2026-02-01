@@ -47,7 +47,7 @@ export async function readSheet(range: string): Promise<string[][] | null | unde
     return response.data.values;
   } catch (error) {
     console.error('Error reading from Google Sheet:', error);
-    return null;
+    throw error;
   }
 }
 
@@ -65,6 +65,7 @@ export async function appendSheet(range: string, values: any[][]): Promise<void>
     console.log('Appended to Google Sheet successfully.');
   } catch (error) {
     console.error('Error appending to Google Sheet:', error);
+    throw error;
   }
 }
 
@@ -82,5 +83,6 @@ export async function updateSheet(range: string, values: any[][]): Promise<void>
     console.log('Updated Google Sheet successfully.');
   } catch (error) {
     console.error('Error updating Google Sheet:', error);
+    throw error;
   }
 }
