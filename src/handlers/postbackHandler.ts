@@ -33,7 +33,19 @@ export async function handlePostbackMsg(ctx: LineBotContext, data: URLSearchPara
   if (action === 'confirm_add_diary') {
     const petName = data.get('petName')!;
     const actionName = data.get('actionName')!;
-    const time = data.get('time') || new Date().toISOString();
+    const description = data.get('description') || '';
+    
+    // Manual UTC+8 formatting: YYYY-MM-DD HH:mm
+    const now = new Date();
+    const utc8Date = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const year = utc8Date.getUTCFullYear();
+    const month = String(utc8Date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(utc8Date.getUTCDate()).padStart(2, '0');
+    const hours = String(utc8Date.getUTCHours()).padStart(2, '0');
+    const minutes = String(utc8Date.getUTCMinutes()).padStart(2, '0');
+    const defaultTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+
+    const time = data.get('time') || defaultTime;
     
     await Promise.all([
       (async () => {
@@ -42,7 +54,7 @@ export async function handlePostbackMsg(ctx: LineBotContext, data: URLSearchPara
         }
       })(),
       ActionService.ensureActionExists(actionName),
-      DiaryService.addEntry(time, petName, actionName, data.get('description') || '')
+      DiaryService.addEntry(time, petName, actionName, description)
     ]);
     return ctx.sendText(MessageUI.diarySaved());
   }

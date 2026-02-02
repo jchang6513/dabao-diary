@@ -53,12 +53,19 @@ export async function parseMessageWithGemini(
   const petList = pets.length > 0 ? pets.join(',') : '無';
   const actionList = actions.length > 0 ? actions.join(',') : '無';
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const currentTime = now.toTimeString().substring(0, 5);
+  const utc8Offset = 8 * 60 * 60 * 1000;
+  const utc8Now = new Date(now.getTime() + utc8Offset);
+  const today = utc8Now.toISOString().split('T')[0];
+  const currentTime = utc8Now.toISOString().split('T')[1].substring(0, 5); // 這行仍然是 ISO 格式，我們改用手動計算
+
+  // 更精確的 HH:mm 計算
+  const hours = String(utc8Now.getUTCHours()).padStart(2, '0');
+  const minutes = String(utc8Now.getUTCMinutes()).padStart(2, '0');
+  const displayTime = `${hours}:${minutes}`;
 
   const prompt = `
 你視為寵物日記助手，負責分析訊息並回傳 JSON。
-現況：日期 ${today}，時間 ${currentTime}，寵物 [${petList}]，動作 [${actionList}]。
+現況：日期 ${today}，時間 ${displayTime}，寵物 [${petList}]，動作 [${actionList}]。
 
 意圖與 JSON 欄位：
 - 'add_diary': {intent, petName, action, description, time}
@@ -70,18 +77,16 @@ export async function parseMessageWithGemini(
 規則：
 1. 僅回傳 JSON (若有多個意圖請用陣列)。
 2. 語系：正體中文。
-3. 'edit' 若未指名時間，視為修改「最近一筆」。
+3. 'edit' 情境：
+   - 若未指名時間，視為修改「最近一筆」。
+   - 如果使用者只輸入一個時間（如「12:00」），且沒有其他資訊，請判斷為 {"intent": "edit", "editTarget": "diary", "newTime": "${today} 12:00"}。
 4. 時間格式：YYYY-MM-DD HH:mm。
-5. 若為 'unknown'，"clarificationPrompt" 必須包含像這樣的引導範例：
-   「我暫時還沒理解您的意思，您可以試著這樣說說看：
-   🐾 記錄內容：『大寶 12:00 吃飯』
-   🔍 查詢紀錄：『大寶今天做了什麼？』
-   ...」
+5. 若為 'unknown'，"clarificationPrompt" 必須包含引導範例。
 
 範例：
+- 「12:00」-> {"intent":"edit","editTarget":"diary","newTime":"${today} 12:00"}
 - 「大寶12:00在睡覺」-> {"intent":"add_diary","petName":"大寶","action":"睡覺","time":"${today} 12:00"}
 - 「修改大寶剛才的時間為13:00」-> {"intent":"edit","editTarget":"diary","petName":"大寶","newTime":"${today} 13:00"}
-- 「大寶今天做了什麼」-> {"intent":"query","queryTarget":"diary","queryFilters":{"petName":"大寶","startDate":"${today}"}}
 
 訊息：「${message}」
   `;
