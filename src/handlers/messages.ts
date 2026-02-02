@@ -27,6 +27,8 @@ export const MessageUI = {
   petNotFound: (name: string) => `找不到寵物「${name}」。`,
   
   diaryUpdated: (changes: string[]) => `已更新日記內容：\n${changes.join('\n')}`,
+  confirmEditDiary: (petName: string, time: string, changes: string[]) => 
+    `確定要修改這筆日記嗎？\n對象：${petName}\n時間：${time}\n\n修改內容：\n${changes.join('\n')}`,
   diaryUpdateNoChanges: () => '未偵測到需要修改的內容。',
   diaryNotFound: () => '找不到符合條件的日記。',
   editUnclear: () => '抱歉，我不確定您想修改什麼。',
@@ -53,7 +55,7 @@ export const MessageUI = {
 
   // 系統相關
   cancel: () => '已取消操作。',
-  modifyRequest: () => '好的，請直接輸入正確的內容，我會重新為您解析。',
+  modifyRequest: () => '好的，請輸入正確的完整內容（例如：大寶 12:00 在睡覺），我會重新為您解析。',
   error: () => '抱歉，處理您的請求時發生錯誤。',
   clarification: (prompt?: string | null) => 
     prompt || `我暫時還沒理解您的意思，您可以試著這樣說說看：

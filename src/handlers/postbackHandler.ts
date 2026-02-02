@@ -30,6 +30,13 @@ export async function handlePostbackMsg(ctx: LineBotContext, data: URLSearchPara
     return ctx.sendText(`成功新增 ${addedCount} 隻寵物！`);
   }
 
+  if (action === 'confirm_edit_diary') {
+    const index = parseInt(data.get('index')!);
+    const updatedRow = JSON.parse(data.get('payload')!);
+    await DiaryService.updateEntry(index, updatedRow);
+    return ctx.sendText('日記已成功修改！');
+  }
+
   if (action === 'confirm_add_diary') {
     const petName = data.get('petName')!;
     const actionName = data.get('actionName')!;

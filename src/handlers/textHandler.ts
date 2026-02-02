@@ -25,8 +25,8 @@ export async function handleTextMsg(ctx: LineBotContext, event: line.MessageEven
         textResponses.push(await handleQueryMsg(parsed));
         break;
       case 'edit':
-        textResponses.push(await handleEditMsg(parsed));
-        break;
+        // 編輯現在也需要 ctx 來發送確認按鈕
+        return handleEditMsg(ctx, parsed);
       case 'add_pet':
         if (parsed.petName) addPetQueue.push(parsed);
         break;
