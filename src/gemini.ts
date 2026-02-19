@@ -26,7 +26,7 @@ export interface ParsedMessage {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-pro';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash';
 
 if (!GEMINI_API_KEY) {
   console.error('GEMINI_API_KEY is not set in environment variables.');

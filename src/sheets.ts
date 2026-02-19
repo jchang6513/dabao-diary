@@ -51,6 +51,20 @@ export async function readSheet(range: string): Promise<string[][] | null | unde
   }
 }
 
+export async function batchReadSheet(ranges: string[]): Promise<(string[][] | null | undefined)[]> {
+  try {
+    const sheets = await getGoogleSheetClient();
+    const response = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: SPREADSHEET_ID,
+      ranges: ranges,
+    });
+    return response.data.valueRanges?.map(vr => vr.values) || [];
+  } catch (error) {
+    console.error('Error batch reading from Google Sheet:', error);
+    throw error;
+  }
+}
+
 export async function appendSheet(range: string, values: any[][]): Promise<void> {
   try {
     const sheets = await getGoogleSheetClient();

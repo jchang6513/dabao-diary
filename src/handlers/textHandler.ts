@@ -1,8 +1,7 @@
 import * as line from '@line/bot-sdk';
 import { parseMessageWithGemini } from '../gemini';
 import { LineBotContext } from '../context';
-import { PetService } from '../services/petService';
-import { ActionService } from '../services/actionService';
+import { metadataService } from '../services/metadataService';
 import { handleQueryMsg } from './queryHandler';
 import { handleEditMsg } from './editHandler';
 import { handleAddMsg } from './addHandler';
@@ -10,7 +9,7 @@ import { MessageUI } from './messages';
 
 export async function handleTextMsg(ctx: LineBotContext, event: line.MessageEvent & { message: line.TextEventMessage }): Promise<any> {
   const userMessage = event.message.text.trim();
-  const [pets, actions] = await Promise.all([PetService.getAllPetNames(), ActionService.getAllActions()]);
+  const { pets, actions } = await metadataService.getMetadata();
   const parsedResults = await parseMessageWithGemini(userMessage, pets, actions);
   
   const textResponses: string[] = [];
